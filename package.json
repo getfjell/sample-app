@@ -26,14 +26,14 @@
     "clean": "rm -rf .next dist"
   },
   "dependencies": {
-    "@fjell/cache": "^4.7",
-    "@fjell/client-api": "^4.4",
-    "@fjell/core": "^4.4",
-    "@fjell/express-router": "^4.4",
-    "@fjell/http-api": "^4.4",
-    "@fjell/lib": "^4.4",
-    "@fjell/lib-sequelize": "^4.4",
-    "@fjell/logging": "^4.4",
+    "@fjell/cache": "^4.7.5",
+    "@fjell/client-api": "^4.4.25",
+    "@fjell/core": "^4.4.35",
+    "@fjell/express-router": "^4.4.33",
+    "@fjell/http-api": "^4.4.34",
+    "@fjell/lib": "^4.4.34",
+    "@fjell/lib-sequelize": "^4.4.31",
+    "@fjell/logging": "^4.4.41",
     "@types/supertest": "^6.0.3",
     "express": "^5.1.0",
     "next": "^15.0.0",
@@ -48,7 +48,7 @@
     "util": "^0.12.5"
   },
   "devDependencies": {
-    "@fjell/eslint-config": "^1.1",
+    "@fjell/eslint-config": "^1.1.20",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
