@@ -1,6 +1,6 @@
 {
   "name": "@fjell/sample-app",
-  "version": "0.0.1-dev.0",
+  "version": "0.0.1",
   "description": "Sample Fjell Next.js Application with Widget and WidgetType models",
   "keywords": [
     "fjell",
