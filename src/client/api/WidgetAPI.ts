@@ -1,7 +1,9 @@
 import { createPItemApi, PItemApi } from '@fjell/client-api';
-import { ApiParams, getHttpApi } from '@fjell/http-api';
+import type { ApiParams } from '@fjell/http-api';
+import { getHttpApi } from '@fjell/http-api';
 import type { Widget } from '../../model/Widget';
 import type { WidgetType } from '../../model/WidgetType';
+import type { WidgetComponent } from '../../model/WidgetComponent';
 
 // Widget Summary interface for business analytics
 export interface WidgetSummary {
@@ -66,6 +68,24 @@ export const widgetTypeApi: PItemApi<WidgetType, 'widgetType'> = createPItemApi(
   httpApi,
   'widgetType',
   'widget-types', // API path
+  {
+    readAuthenticated: false,
+    writeAuthenticated: true,
+    enableErrorHandling: true,
+    retryConfig: {
+      maxRetries: 3,
+      initialDelayMs: 1000,
+      maxDelayMs: 10000,
+      backoffMultiplier: 2,
+      enableJitter: true
+    }
+  }
+);
+
+export const widgetComponentApi: PItemApi<WidgetComponent, 'widgetComponent', 'widget'> = createPItemApi(
+  httpApi,
+  'widgetComponent',
+  'widget-components', // API path
   {
     readAuthenticated: false,
     writeAuthenticated: true,

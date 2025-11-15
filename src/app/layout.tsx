@@ -1,13 +1,60 @@
-import type { Metadata } from 'next'
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { RootAdapters } from '@/client/providers/RootAdapters'
 import { FjellErrorBoundary } from '@/client/components/ErrorBoundary'
 import './globals.css'
 import { ReferenceLoaders } from '@/client/providers/ReferenceLoaders'
 
-export const metadata: Metadata = {
-  title: 'Fjell Sample App',
-  description: 'Widget Management System built with Fjell Framework',
+const navItems = [
+  { href: '/', icon: '🏠', label: 'Home' },
+  { href: '/cache-demo', icon: '🎮', label: 'Cache Demo' },
+  { href: '/cache-debug', icon: '🔍', label: 'Debug' },
+  { href: '/cache-controls', icon: '🧪', label: 'Controls' },
+  { href: '/certification', icon: '🏆', label: 'Certification' },
+  { href: '/api', icon: '📡', label: 'API', isExternal: true },
+];
+
+function Sidebar() {
+  const pathname = usePathname()
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <span className="text-3xl">⚡</span>
+        <div>
+          <h1 className="text-xl font-bold text-white">Fjell</h1>
+          <p className="text-xs text-gray-400">Sample App</p>
+        </div>
+      </div>
+      <nav className="sidebar-nav">
+        {navItems.map(({ href, icon, label, isExternal }) => {
+          const isActive = !isExternal && pathname === href
+          const linkClass = `nav-link ${isActive ? 'nav-link-active' : ''}`
+          
+          if (isExternal) {
+            return (
+              <a key={href} href={href} className={linkClass} target="_blank" rel="noopener noreferrer">
+                <span className="nav-icon">{icon}</span>
+                <span className="nav-label">{label}</span>
+              </a>
+            )
+          }
+
+          return (
+            <Link key={href} href={href} className={linkClass}>
+              <span className="nav-icon">{icon}</span>
+              <span className="nav-label">{label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+      <div className="sidebar-footer">
+        <p className="text-xs">Built with Fjell</p>
+      </div>
+    </aside>
+  )
 }
 
 export default function RootLayout({
@@ -17,36 +64,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <title>Fjell Sample App</title>
+        <meta name="description" content="Widget Management System built with Fjell Framework" />
+      </head>
       <body>
         <FjellErrorBoundary>
           <RootAdapters>
             <ReferenceLoaders>
-              <div className="app">
-                <header className="app-header py-6">
-                  <div className="max-w-7xl mx-auto px-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <h1 className="text-2xl font-bold">Fjell Sample App</h1>
-                        <p className="text-gray-600 mt-1">Widget Management System</p>
-                      </div>
-                    </div>
-                    <nav className="flex space-x-12 justify-center pt-4 border-t border-gray-200">
-                      <Link href="/" className="text-blue-600 hover:text-blue-800 font-medium px-6 py-3 rounded-lg hover:bg-blue-50 transition-all duration-200 text-lg">Home</Link>
-                      <Link href="/cache-demo" className="text-blue-600 hover:text-blue-800 font-medium px-6 py-3 rounded-lg hover:bg-blue-50 transition-all duration-200 text-lg">Cache Demo</Link>
-                      <a href="/api" className="text-blue-600 hover:text-blue-800 font-medium px-6 py-3 rounded-lg hover:bg-blue-50 transition-all duration-200 text-lg" target="_blank">API Info</a>
-                    </nav>
-                  </div>
-                </header>
-
-                <main className="app-main">
+              <div className="app-layout">
+                <Sidebar />
+                <main className="main-content">
                   <FjellErrorBoundary>
                     {children}
                   </FjellErrorBoundary>
                 </main>
-
-                <footer className="app-footer">
-                  <p>Built with Fjell Framework</p>
-                </footer>
               </div>
             </ReferenceLoaders>
           </RootAdapters>

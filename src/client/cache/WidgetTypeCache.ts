@@ -61,10 +61,23 @@ export const widgetTypeCacheUtils = {
   /**
    * Get widget type cache statistics for monitoring
    */
-  getCacheStats: () => {
-    const sizeInfo = widgetTypeCache.cacheMap.getCurrentSize();
+  getCacheStats: async () => {
+    const sizeInfo = await widgetTypeCache.cacheMap.getCurrentSize();
+    
+    // Get two-layer stats if available
+    let queryCount = 0;
+    let facetCount = 0;
+    
+    if ('getTwoLayerStats' in widgetTypeCache.cacheMap && typeof widgetTypeCache.cacheMap.getTwoLayerStats === 'function') {
+      const twoLayerStats = widgetTypeCache.cacheMap.getTwoLayerStats();
+      queryCount = twoLayerStats.queryMetadata.complete;
+      facetCount = twoLayerStats.queryMetadata.partial;
+    }
+    
     return {
-      ...sizeInfo
+      itemCount: sizeInfo.itemCount,
+      queryCount,
+      facetCount
     };
   }
 };

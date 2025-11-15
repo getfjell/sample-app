@@ -51,9 +51,12 @@ describe('Widget Routes', () => {
         .get('/widgets')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({
+        success: true,
+        data: expect.any(Array)
+      });
 
-      const ourWidgets = response.body.filter((w: any) =>
+      const ourWidgets = response.body.data.filter((w: any) =>
         [widget1.id, widget2.id].includes(w.id)
       );
       expect(ourWidgets).toHaveLength(2);
@@ -67,7 +70,10 @@ describe('Widget Routes', () => {
         .get('/widgets')
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body).toMatchObject({
+        success: true,
+        data: []
+      });
     });
   });
 
@@ -92,9 +98,12 @@ describe('Widget Routes', () => {
         .get('/widgets?finder=active&finderParams={}')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({
+        success: true,
+        data: expect.any(Array)
+      });
 
-      const activeWidgets = response.body;
+      const activeWidgets = response.body.data;
       const foundActive = activeWidgets.find((w: any) => w.id === activeWidget.id);
       const foundInactive = activeWidgets.find((w: any) => w.id === inactiveWidget.id);
 
@@ -126,9 +135,12 @@ describe('Widget Routes', () => {
         .get(`/widgets?finder=byType&finderParams=${JSON.stringify({ widgetTypeId: testWidgetType.id })}`)
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({
+        success: true,
+        data: expect.any(Array)
+      });
 
-      const typeWidgets = response.body;
+      const typeWidgets = response.body.data;
       const foundWidget1 = typeWidgets.find((w: any) => w.id === widget1.id);
       const foundWidget2 = typeWidgets.find((w: any) => w.id === widget2.id);
 
@@ -141,7 +153,10 @@ describe('Widget Routes', () => {
         .get('/widgets?finder=byType&finderParams=' + JSON.stringify({ widgetTypeId: 'non-existent-id' }))
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body).toMatchObject({
+        success: true,
+        data: []
+      });
     });
   });
 
@@ -159,11 +174,14 @@ describe('Widget Routes', () => {
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: widget.id,
-        name: 'Specific Widget',
-        description: 'A specific widget for testing',
-        widgetTypeId: testWidgetType.id,
-        isActive: true
+        success: true,
+        data: {
+          id: widget.id,
+          name: 'Specific Widget',
+          description: 'A specific widget for testing',
+          widgetTypeId: testWidgetType.id,
+          isActive: true
+        }
       });
     });
 
@@ -173,7 +191,8 @@ describe('Widget Routes', () => {
         .expect(404);
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
   });

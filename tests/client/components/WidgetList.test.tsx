@@ -188,8 +188,9 @@ describe('WidgetList', () => {
       renderList();
 
       // Only the active widget renders a Delete button
-      const card = screen.getByText('Active Widget').closest('.widget-card') as HTMLElement;
-      const deleteButton = within(card as HTMLElement).getByText('Delete');
+      const row = screen.getByText('Active Widget').closest('tr') as HTMLElement;
+      expect(row).not.toBeNull();
+      const deleteButton = within(row).getByText('Delete');
       fireEvent.click(deleteButton);
 
       await waitFor(() => {
@@ -206,8 +207,9 @@ describe('WidgetList', () => {
       mockUseWidgets.mockReturnValue({ ...defaultContext, remove });
 
       renderList();
-      const card = screen.getByText('Active Widget').closest('.widget-card') as HTMLElement;
-      fireEvent.click(within(card as HTMLElement).getByText('Delete'));
+      const row = screen.getByText('Active Widget').closest('tr') as HTMLElement;
+      expect(row).not.toBeNull();
+      fireEvent.click(within(row).getByText('Delete'));
 
       expect(confirmSpy).toHaveBeenCalled();
       expect(remove).not.toHaveBeenCalled();
@@ -221,8 +223,9 @@ describe('WidgetList', () => {
       mockUseWidgets.mockReturnValue({ ...defaultContext, remove });
 
       renderList();
-      const card = screen.getByText('Active Widget').closest('.widget-card') as HTMLElement;
-      fireEvent.click(within(card as HTMLElement).getByText('Delete'));
+      const row = screen.getByText('Active Widget').closest('tr') as HTMLElement;
+      expect(row).not.toBeNull();
+      fireEvent.click(within(row).getByText('Delete'));
 
       await waitFor(() => {
         expect(alertSpy).toHaveBeenCalledWith('Failed to delete widget. Please try again.');

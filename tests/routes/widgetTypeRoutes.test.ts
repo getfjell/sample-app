@@ -46,9 +46,9 @@ describe('WidgetType Routes', () => {
         .get('/widget-types')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
 
-      const ourTypes = response.body.filter((wt: any) =>
+      const ourTypes = response.body.data.filter((wt: any) =>
         [widgetType1.id, widgetType2.id].includes(wt.id)
       );
       expect(ourTypes).toHaveLength(2);
@@ -69,7 +69,7 @@ describe('WidgetType Routes', () => {
         .get('/widget-types')
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body).toMatchObject({ success: true, data: [] });
 
       // Clean up
       await freshTestDb.cleanup();
@@ -99,9 +99,9 @@ describe('WidgetType Routes', () => {
         .get('/widget-types?finder=active&finderParams={}')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
 
-      const activeTypes = response.body;
+      const activeTypes = response.body.data;
       const foundActive = activeTypes.find((wt: any) => wt.id === activeType.id);
       const foundInactive = activeTypes.find((wt: any) => wt.id === inactiveType.id);
 
@@ -125,11 +125,14 @@ describe('WidgetType Routes', () => {
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: widgetType.id,
-        code: 'SPECIFIC_TYPE',
-        name: 'Specific Widget Type',
-        description: 'A specific widget type for testing',
-        isActive: true
+        success: true,
+        data: {
+          id: widgetType.id,
+          code: 'SPECIFIC_TYPE',
+          name: 'Specific Widget Type',
+          description: 'A specific widget type for testing',
+          isActive: true
+        }
       });
     });
 
@@ -139,7 +142,8 @@ describe('WidgetType Routes', () => {
         .expect(404);
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
   });
@@ -158,11 +162,14 @@ describe('WidgetType Routes', () => {
         .expect(201);
 
       expect(response.body).toMatchObject({
-        id: expect.any(String),
-        code: 'NEW_TYPE',
-        name: 'New Widget Type',
-        description: 'A newly created widget type',
-        isActive: true
+        success: true,
+        data: {
+          id: expect.any(String),
+          code: 'NEW_TYPE',
+          name: 'New Widget Type',
+          description: 'A newly created widget type',
+          isActive: true
+        }
       });
     });
 
@@ -177,7 +184,7 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.code).toBe('LOWERCASE_CODE');
+      expect(response.body.data.code).toBe('LOWERCASE_CODE');
     });
 
     it('should validate required fields', async () => {
@@ -189,7 +196,7 @@ describe('WidgetType Routes', () => {
       const response = await request(app)
         .post('/widget-types')
         .send(invalidData)
-        .expect(500);
+        .expect(400);
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -205,7 +212,7 @@ describe('WidgetType Routes', () => {
       const response = await request(app)
         .post('/widget-types')
         .send(invalidData)
-        .expect(500);
+        .expect(400);
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -221,7 +228,7 @@ describe('WidgetType Routes', () => {
       const response = await request(app)
         .post('/widget-types')
         .send(invalidData)
-        .expect(500);
+        .expect(400);
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -237,7 +244,7 @@ describe('WidgetType Routes', () => {
       const response = await request(app)
         .post('/widget-types')
         .send(invalidData)
-        .expect(500);
+        .expect(400);
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -272,11 +279,14 @@ describe('WidgetType Routes', () => {
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: testWidgetType.id,
-        code: 'UPDATED_TEST',
-        name: 'Updated Test Type',
-        description: 'Updated description',
-        isActive: false
+        success: true,
+        data: {
+          id: testWidgetType.id,
+          code: 'UPDATED_TEST',
+          name: 'Updated Test Type',
+          description: 'Updated description',
+          isActive: false
+        }
       });
     });
 
@@ -290,7 +300,7 @@ describe('WidgetType Routes', () => {
         .send(updateData)
         .expect(200);
 
-      expect(response.body.code).toBe('UPDATED_LOWERCASE_CODE');
+      expect(response.body.data.code).toBe('UPDATED_LOWERCASE_CODE');
     });
 
     it('should return 404 for non-existent widget type', async () => {
@@ -299,10 +309,11 @@ describe('WidgetType Routes', () => {
       const response = await request(app)
         .put('/widget-types/non-existent-id')
         .send(updateData)
-        .expect(500);
+        .expect(404);
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
 
@@ -314,9 +325,9 @@ describe('WidgetType Routes', () => {
         .send(updateData)
         .expect(200);
 
-      expect(response.body.name).toBe('Partially Updated Type');
-      expect(response.body.code).toBe('UPDATE_TEST'); // Should remain unchanged
-      expect(response.body.description).toBe('Original description'); // Should remain unchanged
+      expect(response.body.data.name).toBe('Partially Updated Type');
+      expect(response.body.data.code).toBe('UPDATE_TEST'); // Should remain unchanged
+      expect(response.body.data.description).toBe('Original description'); // Should remain unchanged
     });
   });
 
@@ -338,9 +349,8 @@ describe('WidgetType Routes', () => {
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: testWidgetType.id,
-        code: 'DELETE_TEST',
-        name: 'Type to Delete'
+        success: true,
+        message: 'Widget type deleted successfully'
       });
 
       // Verify widget type is deleted
@@ -352,10 +362,11 @@ describe('WidgetType Routes', () => {
     it('should return 404 for non-existent widget type', async () => {
       const response = await request(app)
         .delete('/widget-types/non-existent-id')
-        .expect(500);
+        .expect(404);
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
   });
@@ -382,7 +393,7 @@ describe('WidgetType Routes', () => {
           .send(widgetTypeData)
           .expect(201);
 
-        expect(response.body.code).toBe(code);
+        expect(response.body.data.code).toBe(code);
       }
     });
 
@@ -406,7 +417,7 @@ describe('WidgetType Routes', () => {
         const response = await request(app)
           .post('/widget-types')
           .send(widgetTypeData)
-          .expect(500);
+          .expect(400);
 
         expect(response.body).toMatchObject({
           error: expect.any(String)
@@ -426,7 +437,7 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.code).toBe(maxLengthCode);
+      expect(response.body.data.code).toBe(maxLengthCode);
     });
 
     it('should handle single character code', async () => {
@@ -440,7 +451,7 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.code).toBe('A');
+      expect(response.body.data.code).toBe('A');
     });
   });
 
@@ -457,7 +468,7 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.name).toBe(maxLengthName);
+      expect(response.body.data.name).toBe(maxLengthName);
     });
 
     it('should handle unicode characters in name', async () => {
@@ -472,8 +483,8 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.name).toBe('测试小部件类型 🎯');
-      expect(response.body.description).toBe('Ñoño descripción with émojis 🚀');
+      expect(response.body.data.name).toBe('测试小部件类型 🎯');
+      expect(response.body.data.description).toBe('Ñoño descripción with émojis 🚀');
     });
 
     it('should trim whitespace from code and name', async () => {
@@ -487,8 +498,8 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.code).toBe('TRIM_TEST');
-      expect(response.body.name).toBe('Trim Test Type');
+      expect(response.body.data.code).toBe('TRIM_TEST');
+      expect(response.body.data.name).toBe('Trim Test Type');
     });
   });
 
@@ -505,7 +516,8 @@ describe('WidgetType Routes', () => {
         .expect(500);
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
 
       // Restore original function
@@ -526,7 +538,7 @@ describe('WidgetType Routes', () => {
       const response = await request(app)
         .post('/widget-types')
         .send({})
-        .expect(500);
+        .expect(400);
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -545,7 +557,7 @@ describe('WidgetType Routes', () => {
         .send(nullData)
         .expect(201);
 
-      expect(response.body.description).toBe(null);
+      expect(response.body.data.description).toBe(null);
     });
   });
 
@@ -555,7 +567,7 @@ describe('WidgetType Routes', () => {
         .get('/widget-types?active=true&limit=10')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
     });
 
     it('should handle requests with custom headers', async () => {
@@ -564,7 +576,7 @@ describe('WidgetType Routes', () => {
         .set('X-Custom-Header', 'test-value')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
     });
   });
 
@@ -581,7 +593,7 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.isActive).toBe(true);
+      expect(response.body.data.isActive).toBe(true);
     });
 
     it('should preserve explicit active status', async () => {
@@ -596,7 +608,7 @@ describe('WidgetType Routes', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.isActive).toBe(false);
+      expect(response.body.data.isActive).toBe(false);
     });
   });
 });

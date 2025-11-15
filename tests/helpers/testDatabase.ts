@@ -3,6 +3,7 @@ import { Database } from '../../src/database';
 import { createRegistry, Registry } from '@fjell/registry';
 import { createWidgetLibrary } from '../../src/lib/WidgetLib';
 import { createWidgetTypeLibrary } from '../../src/lib/WidgetTypeLib';
+import { createWidgetComponentLibrary } from '../../src/lib/WidgetComponentLib';
 import type { ModelStatic } from 'sequelize';
 
 /**
@@ -15,6 +16,7 @@ export class TestDatabase {
   private libraries?: {
     widgetType: any;
     widget: any;
+    widgetComponent: any;
   };
 
   constructor(databaseName = ':memory:') {
@@ -78,13 +80,17 @@ export class TestDatabase {
     return {
       WidgetTypeModel: models.WidgetTypeModel,
       WidgetModel: models.WidgetModel,
+      WidgetComponentModel: models.WidgetComponentModel,
       widgetTypeModel: models.WidgetTypeModel,
-      widgetModel: models.WidgetModel
+      widgetModel: models.WidgetModel,
+      widgetComponentModel: models.WidgetComponentModel
     } as {
       WidgetTypeModel: ModelStatic<any>;
       WidgetModel: ModelStatic<any>;
+      WidgetComponentModel: ModelStatic<any>;
       widgetTypeModel: ModelStatic<any>;
       widgetModel: ModelStatic<any>;
+      widgetComponentModel: ModelStatic<any>;
     };
   }
 
@@ -95,6 +101,9 @@ export class TestDatabase {
     try {
       const models = this.getModels();
       // Clear in correct order due to foreign key constraints
+      if (models.WidgetComponentModel) {
+        await models.WidgetComponentModel.destroy({ where: {}, truncate: true });
+      }
       await models.WidgetModel.destroy({ where: {}, truncate: true });
       await models.WidgetTypeModel.destroy({ where: {}, truncate: true });
     } catch (error) {
@@ -132,17 +141,39 @@ export class TestDatabase {
   }
 
   /**
-   * Get or create Widget/WidgetType libraries backed by current models
+   * Get or create Widget/WidgetType/WidgetComponent libraries backed by current models
    */
   getLibraries() {
     if (!this.libraries) {
       const registry = this.getRegistry();
-      const { WidgetModel, WidgetTypeModel } = this.database.getModels();
+      const { WidgetModel, WidgetTypeModel, WidgetComponentModel } = this.database.getModels();
       const widgetType = createWidgetTypeLibrary(registry, WidgetTypeModel);
       const widget = createWidgetLibrary(registry, WidgetModel, WidgetTypeModel);
-      this.libraries = { widgetType, widget };
+      const widgetComponent = createWidgetComponentLibrary(registry, WidgetComponentModel, WidgetModel);
+      this.libraries = { widgetType, widget, widgetComponent };
     }
     return this.libraries;
+  }
+
+  /**
+   * Get the Widget library specifically
+   */
+  getWidgetLibrary() {
+    return this.getLibraries().widget;
+  }
+
+  /**
+   * Get the WidgetType library specifically
+   */
+  getWidgetTypeLibrary() {
+    return this.getLibraries().widgetType;
+  }
+
+  /**
+   * Get the WidgetComponent library specifically
+   */
+  getWidgetComponentLibrary() {
+    return this.getLibraries().widgetComponent;
   }
 
   /**
@@ -160,6 +191,15 @@ export class TestDatabase {
   async createWidget(props: any) {
     const { WidgetModel } = this.database.getModels();
     const created = await WidgetModel.create(props);
+    return created.toJSON ? created.toJSON() : created;
+  }
+
+  /**
+   * Convenience to create a WidgetComponent row for tests
+   */
+  async createWidgetComponent(props: any) {
+    const { WidgetComponentModel } = this.database.getModels();
+    const created = await WidgetComponentModel.create(props);
     return created.toJSON ? created.toJSON() : created;
   }
 }

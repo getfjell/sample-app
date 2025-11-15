@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { getLogger } from '@fjell/logging';
 import { createWidgetRouter } from './widgetRoutes';
 import { createWidgetTypeRouter } from './widgetTypeRoutes';
-import { createCacheRoutes } from './cacheRoutes';
+import { createWidgetComponentRouter } from './widgetComponentRoutes';
 import { Widget } from '../model/Widget';
 import { WidgetType } from '../model/WidgetType';
+import { WidgetComponent } from '../model/WidgetComponent';
 import type { SequelizeLibrary } from '@fjell/lib-sequelize';
 
 const logger = getLogger('Routes');
@@ -14,7 +15,8 @@ const logger = getLogger('Routes');
  */
 export const createApiRoutes = (
   widgetLibrary: SequelizeLibrary<Widget, 'widget'>,
-  widgetTypeLibrary: SequelizeLibrary<WidgetType, 'widgetType'>
+  widgetTypeLibrary: SequelizeLibrary<WidgetType, 'widgetType'>,
+  widgetComponentLibrary: SequelizeLibrary<WidgetComponent, 'widgetComponent', 'widget'>
 ): Router => {
   logger.info('Creating API routes...');
 
@@ -39,8 +41,10 @@ export const createApiRoutes = (
       // Get counts from the libraries
       const widgetTypes = await widgetTypeLibrary.operations.all({});
       const widgets = await widgetLibrary.operations.all({});
+      const widgetComponents = await widgetComponentLibrary.operations.all({});
       const activeWidgetTypes = widgetTypes.filter(wt => wt.isActive);
       const activeWidgets = widgets.filter(w => w.isActive);
+      const activeComponents = widgetComponents.filter(wc => wc.status === 'active');
 
       res.json({
         status: 'operational',
@@ -55,6 +59,10 @@ export const createApiRoutes = (
           widgets: {
             total: widgets.length,
             active: activeWidgets.length
+          },
+          widgetComponents: {
+            total: widgetComponents.length,
+            active: activeComponents.length
           }
         },
         uptime: process.uptime()
@@ -135,12 +143,10 @@ export const createApiRoutes = (
     }
   });
 
-  // Mount the widget type and widget routers
+  // Mount the widget type and widget routers using standard fjell PItemRouter patterns
   apiRouter.use('/widget-types', createWidgetTypeRouter(widgetTypeLibrary));
   apiRouter.use('/widgets', createWidgetRouter(widgetLibrary));
-
-  // Mount the Two Layer Cache demonstration router
-  apiRouter.use('/cache', createCacheRoutes(widgetLibrary, widgetTypeLibrary));
+  apiRouter.use('/widget-components', createWidgetComponentRouter(widgetComponentLibrary));
 
   logger.info('API routes created successfully', {
     routes: {
@@ -149,7 +155,7 @@ export const createApiRoutes = (
       dashboard: '/dashboard',
       widgetTypes: '/widget-types',
       widgets: '/widgets',
-      cache: '/cache'
+      widgetComponents: '/widget-components'
     }
   });
 
@@ -159,4 +165,4 @@ export const createApiRoutes = (
 // Re-export route creation functions
 export { createWidgetRouter } from './widgetRoutes';
 export { createWidgetTypeRouter } from './widgetTypeRoutes';
-export { createCacheRoutes } from './cacheRoutes';
+export { createWidgetComponentRouter } from './widgetComponentRoutes';

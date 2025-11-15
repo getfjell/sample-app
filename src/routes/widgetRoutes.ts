@@ -1,226 +1,161 @@
 import { PItemRouter } from '@fjell/express-router';
-import { Request, Response, Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
 import { getLogger } from '@fjell/logging';
 import { Widget } from '../model/Widget';
 import type { SequelizeLibrary } from '@fjell/lib-sequelize';
-import { CreateValidationError, NotFoundError, RemoveError, UpdateError } from '@fjell/lib';
+import { NotFoundError } from '@fjell/http-api';
 
 const logger = getLogger('WidgetRoutes');
+
+/**
+ * Response wrapper middleware to format responses consistently
+ */
+const responseWrapper = (req: Request, res: Response, next: NextFunction) => {
+  const originalJson = res.json.bind(res);
+  const originalStatus = res.status.bind(res);
+  let statusCode = 200;
+  let isDelete = false;
+
+  // Track if this is a DELETE request
+  if (req.method === 'DELETE') {
+    isDelete = true;
+  }
+
+  // Wrap status to track status code
+  res.status = function(code: number) {
+    statusCode = code;
+    return originalStatus(code);
+  };
+
+  // Wrap json to add success/data wrapper
+  res.json = function(body: any) {
+    // For DELETE requests, if we get an item back, format as success message
+    if (isDelete && body && typeof body === 'object' && 'key' in body && statusCode === 200) {
+      return originalJson({ success: true, message: 'Widget deleted successfully' });
+    }
+
+    // If it's an array, wrap it
+    if (Array.isArray(body)) {
+      return originalJson({ success: true, data: body });
+    }
+
+    // Format error responses
+    if (statusCode >= 400) {
+      if (body && typeof body === 'object') {
+        // If it already has success/error format, pass through
+        if ('success' in body || 'error' in body) {
+          return originalJson(body);
+        }
+        // Format error responses - check for NotFoundError patterns
+        if ('ik' in body && 'message' in body) {
+          // This is likely a NotFoundError response from ItemRouter
+          const errorMsg = body.message || 'Item not found';
+          // If status is already 404, keep it; otherwise the router should have set it
+          return originalJson({ success: false, error: errorMsg });
+        }
+        // Format error responses
+        if ('message' in body) {
+          return originalJson({ success: false, error: body.message || 'An error occurred' });
+        }
+        // Generic error object
+        return originalJson({ success: false, error: body.error || 'An error occurred' });
+      }
+      if (typeof body === 'string') {
+        return originalJson({ success: false, error: body });
+      }
+      return originalJson({ success: false, error: 'An error occurred' });
+    }
+
+    // If it's an object with success already, pass through
+    if (body && typeof body === 'object' && 'success' in body) {
+      return originalJson(body);
+    }
+
+    // If it's an object (item), wrap it
+    if (body && typeof body === 'object' && !('success' in body) && !('error' in body)) {
+      return originalJson({ success: true, data: body });
+    }
+
+    // Otherwise pass through
+    return originalJson(body);
+  };
+
+  next();
+};
 
 /**
  * Create Express router for Widget endpoints
  *
  * This router provides RESTful endpoints for managing widgets using PItemRouter.
- * Custom functionality is available via finders using query parameters like:
- * - GET /widgets?finder=active
- * - GET /widgets?finder=byType&finderParams={"widgetTypeId":"123"}
- * - GET /widgets?finder=byTypeCode&finderParams={"code":"PREMIUM"}
+ * Use standard fjell patterns:
+ * - GET /widgets - all widgets
+ * - GET /widgets?finder=active - active widgets finder
+ * - GET /widgets?finder=byType&finderParams={"widgetTypeId":"123"} - by type finder
+ * - GET /widgets?finder=byTypeCode&finderParams={"code":"PREMIUM"} - by type code finder
+ * - POST /widgets - create widget
+ * - GET /widgets/:id - get widget by id
+ * - PUT /widgets/:id - update widget
+ * - DELETE /widgets/:id - delete widget
+ * - GET /widgets/summary - widget summary statistics
  */
 export const createWidgetRouter = (
   widgetLibrary: SequelizeLibrary<Widget, 'widget'>
 ): Router => {
   logger.info('Creating Widget router...');
 
-  // Create a new router
+  // Create the PItemRouter for standard CRUD operations
+  const pItemRouter = new PItemRouter(widgetLibrary, 'widget');
+  const baseRouter = pItemRouter.getRouter();
+
+  // Create a new router to add custom routes and middleware
   const router = Router();
 
-  // GET /widgets/summary - summary statistics (MUST be before PItemRouter)
+  // Add response wrapper middleware - must be first
+  router.use(responseWrapper);
+
+  // Add summary endpoint - must be before /:id route from baseRouter
   router.get('/summary', async (req: Request, res: Response) => {
     try {
-      const libOperations = widgetLibrary.operations;
-      const allWidgets = await libOperations.all({});
+      const widgets = await widgetLibrary.operations.all({});
+      const activeWidgets = widgets.filter(w => w.isActive);
+      const inactiveWidgets = widgets.filter(w => !w.isActive);
 
-      const total = allWidgets.length;
-      const active = allWidgets.filter(w => w.isActive).length;
-      const inactive = total - active;
-
-      // Group by type
-      const byType: Record<string, number> = {};
-      allWidgets.forEach(widget => {
+      // Group by widget type
+      const byType: Record<string, { total: number; active: number; inactive: number }> = {};
+      widgets.forEach(widget => {
         const typeId = widget.widgetTypeId;
-        byType[typeId] = (byType[typeId] || 0) + 1;
+        if (!byType[typeId]) {
+          byType[typeId] = { total: 0, active: 0, inactive: 0 };
+        }
+        byType[typeId].total++;
+        if (widget.isActive) {
+          byType[typeId].active++;
+        } else {
+          byType[typeId].inactive++;
+        }
       });
 
       res.json({
         success: true,
         data: {
-          total,
-          active,
-          inactive,
+          total: widgets.length,
+          active: activeWidgets.length,
+          inactive: inactiveWidgets.length,
           byType
         }
       });
-    } catch (error: any) {
-      logger.error('Error in GET /widgets/summary', { error: error.message });
-      res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-  });
-
-  // Complex test endpoints (MUST be BEFORE PItemRouter to take precedence)
-
-  // POST endpoint - wrap all responses in success/data format
-  router.post('/', async (req: Request, res: Response, next) => {
-    // Debug logging
-    logger.info('POST /widgets - checking headers', { headers: req.headers });
-
-    try {
-      // Handle empty request body
-      if (!req.body || Object.keys(req.body).length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: 'Request body cannot be empty'
-        });
-      }
-
-      const libOperations = widgetLibrary.operations;
-      const widget = await libOperations.create(req.body);
-
-      res.status(201).json({
-        success: true,
-        data: widget
+    } catch (error) {
+      logger.error('Error getting widget summary', { error });
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get widget summary'
       });
-    } catch (error: any) {
-      logger.error('Error in POST /widgets', { error: error.message });
-
-      // Handle validation errors
-      if (error.name === 'CreateValidationError' ||
-        error.name === 'ValidationError' ||
-        error.name === 'SequelizeValidationError' ||
-        error.message?.includes('validation') ||
-        error.message?.includes('Validation failed') ||
-        error.message?.includes('required') ||
-        error.message?.includes('must be') ||
-        error.message?.includes('cannot be') ||
-        error.message?.includes('notNull Violation') ||
-        error.message?.includes('cannot be null') ||
-        error.message?.includes('Required field')) {
-        res.status(400).json({
-          success: false,
-          error: error.message || 'Validation failed'
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error'
-        });
-      }
     }
   });
 
-  // PUT endpoint - wrap all responses in success/data format
-  router.put('/:id', async (req: Request, res: Response, next) => {
-    try {
-      const libOperations = widgetLibrary.operations;
-      const ik = { kt: 'widget' as const, pk: req.params.id };
-      const updatedWidget = await libOperations.update(ik, req.body);
-
-      res.json({
-        success: true,
-        data: updatedWidget
-      });
-    } catch (error: any) {
-      logger.error('Error in PUT /widgets/:id', { error: error.message });
-
-      // Check if it's a not found error
-      if (error.name === 'NotFoundError' || error.name === 'UpdateError' || error.message?.includes('not found') || error.message?.includes('Update Failed')) {
-        res.status(404).json({
-          success: false,
-          error: error.message || 'Widget not found'
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error'
-        });
-      }
-    }
-  });
-
-  // DELETE endpoint - wrap all responses in success/message format
-  router.delete('/:id', async (req: Request, res: Response, next) => {
-    try {
-      const libOperations = widgetLibrary.operations;
-      const ik = { kt: 'widget' as const, pk: req.params.id };
-      await libOperations.remove(ik);
-
-      res.json({
-        success: true,
-        message: 'Widget deleted successfully'
-      });
-    } catch (error: any) {
-      logger.error('Error in DELETE /widgets/:id', { error: error.message });
-
-      // Check if it's a not found error
-      if (error.name === 'NotFoundError' || error.name === 'RemoveError' || error.message?.includes('not found')) {
-        res.status(404).json({
-          success: false,
-          error: error.message || 'Widget not found'
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error'
-        });
-      }
-    }
-  });
-
-  // GET /widgets - handle all cases (simple GET and special finder cases) - MUST BE FIRST
-  router.get('/', async (req: Request, res: Response, next) => {
-    const query = req.query as any;
-    const finder = query['finder'] as string;
-    const needsWrappedResponse = req.query.active || req.query.limit || req.headers['x-custom-header'];
-
-    try {
-      const libOperations = widgetLibrary.operations;
-      let widgets: Widget[] = [];
-
-      if (finder) {
-        const finderParams = query['finderParams'] as string;
-        logger.info('Finding widgets with finder', { finder, finderParams });
-        widgets = await libOperations.find(finder, finderParams ? JSON.parse(finderParams) : {});
-      } else {
-        widgets = await libOperations.all({});
-      }
-
-      // Return success format for special requests, otherwise return widgets array directly
-      if (needsWrappedResponse) {
-        res.json({ success: true, data: widgets });
-      } else {
-        res.json(widgets);
-      }
-    } catch (error: any) {
-      logger.error('Error in GET /widgets', { error: error.message });
-      res.status(500).json({ success: false, error: 'Internal server error' });
-    }
-  });
-
-  // GET /widgets/:id - handle individual widget retrieval with proper error format
-  router.get('/:id', async (req: Request, res: Response, next) => {
-    try {
-      const libOperations = widgetLibrary.operations;
-      const ik = { kt: 'widget' as const, pk: req.params.id };
-      const widget = await libOperations.get(ik);
-      res.json(widget);
-    } catch (error: any) {
-      logger.error('Error in GET /widgets/:id', { error: error.message });
-
-      // Check if it's a not found error
-      if (error.name === 'NotFoundError' || error.message?.includes('not found')) {
-        res.status(404).json({
-          message: error.message || 'Widget not found'
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error'
-        });
-      }
-    }
-  });
-
-  // Note: We're handling all routes manually to ensure proper response formatting
-  // instead of using PItemRouter which has different response format expectations
+  // Mount all routes from PItemRouter (includes /:id route)
+  // The response wrapper middleware will format all responses
+  router.use(baseRouter);
 
   logger.info('Widget router created successfully');
   return router;

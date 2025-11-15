@@ -124,8 +124,93 @@ export const initializeModels = (sequelize: Sequelize) => {
     as: 'widgetType'
   });
 
+  // WidgetComponent model definition
+  const WidgetComponentModel = sequelize.define('WidgetComponent', {
+    id: {
+      type: DataTypes.UUID,
+      primaryKey: true,
+      defaultValue: DataTypes.UUIDV4,
+      allowNull: false
+    },
+    widgetId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: WidgetModel,
+        key: 'id'
+      },
+      validate: {
+        notEmpty: true
+      }
+    },
+    componentTypeId: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
+    },
+    name: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      validate: {
+        len: [1, 255],
+        notEmpty: true
+      }
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'active', 'complete'),
+      allowNull: false,
+      defaultValue: 'pending'
+    },
+    priority: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      validate: {
+        min: 0,
+        max: 100
+      }
+    },
+    config: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: null
+    }
+  }, {
+    tableName: 'widget_components',
+    timestamps: true,
+    paranoid: false,
+    indexes: [
+      {
+        fields: ['widgetId']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['priority']
+      },
+      {
+        fields: ['componentTypeId']
+      }
+    ]
+  });
+
+  // Define associations
+  WidgetModel.hasMany(WidgetComponentModel, {
+    foreignKey: 'widgetId',
+    as: 'components'
+  });
+
+  WidgetComponentModel.belongsTo(WidgetModel, {
+    foreignKey: 'widgetId',
+    as: 'widget'
+  });
+
   return {
     WidgetTypeModel: WidgetTypeModel as ModelStatic<any>,
-    WidgetModel: WidgetModel as ModelStatic<any>
+    WidgetModel: WidgetModel as ModelStatic<any>,
+    WidgetComponentModel: WidgetComponentModel as ModelStatic<any>
   };
 };

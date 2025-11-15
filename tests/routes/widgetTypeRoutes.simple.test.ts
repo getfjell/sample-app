@@ -46,8 +46,8 @@ describe('WidgetType Routes (Simplified)', () => {
         .get('/widget-types')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
-      const ourTypes = response.body.filter((wt: any) =>
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
+      const ourTypes = response.body.data.filter((wt: any) =>
         [widgetType1.id, widgetType2.id].includes(wt.id)
       );
       expect(ourTypes).toHaveLength(2);
@@ -58,7 +58,7 @@ describe('WidgetType Routes (Simplified)', () => {
         .get('/widget-types')
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body).toMatchObject({ success: true, data: [] });
     });
   });
 
@@ -84,9 +84,9 @@ describe('WidgetType Routes (Simplified)', () => {
         .get('/widget-types?finder=active&finderParams={}')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
-      const foundActive = response.body.find((wt: any) => wt.id === activeType.id);
-      const foundInactive = response.body.find((wt: any) => wt.id === inactiveType.id);
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
+      const foundActive = response.body.data.find((wt: any) => wt.id === activeType.id);
+      const foundInactive = response.body.data.find((wt: any) => wt.id === inactiveType.id);
 
       expect(foundActive).toBeDefined();
       expect(foundInactive).toBeUndefined();
@@ -104,9 +104,9 @@ describe('WidgetType Routes (Simplified)', () => {
         .get(`/widget-types?finder=byCode&finderParams=${JSON.stringify({ code: 'FIND_BY_CODE' })}`)
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0]).toMatchObject({
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0]).toMatchObject({
         id: widgetType.id,
         code: 'FIND_BY_CODE',
         name: 'Find By Code Type'
@@ -129,11 +129,14 @@ describe('WidgetType Routes (Simplified)', () => {
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: widgetType.id,
-        code: 'SPECIFIC_TYPE',
-        name: 'Specific Widget Type',
-        description: 'A specific widget type for testing',
-        isActive: true
+        success: true,
+        data: {
+          id: widgetType.id,
+          code: 'SPECIFIC_TYPE',
+          name: 'Specific Widget Type',
+          description: 'A specific widget type for testing',
+          isActive: true
+        }
       });
     });
 
@@ -143,7 +146,8 @@ describe('WidgetType Routes (Simplified)', () => {
         .expect(404);
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
   });
@@ -163,11 +167,14 @@ describe('WidgetType Routes (Simplified)', () => {
         .expect(201);
 
       expect(response.body).toMatchObject({
-        id: expect.any(String),
-        code: 'NEW_TYPE',
-        name: 'New Widget Type',
-        description: 'A newly created widget type',
-        isActive: true
+        success: true,
+        data: {
+          id: expect.any(String),
+          code: 'NEW_TYPE',
+          name: 'New Widget Type',
+          description: 'A newly created widget type',
+          isActive: true
+        }
       });
     });
 
@@ -182,14 +189,14 @@ describe('WidgetType Routes (Simplified)', () => {
         .send(widgetTypeData)
         .expect(201);
 
-      expect(response.body.code).toBe('LOWERCASE_CODE');
+      expect(response.body.data.code).toBe('LOWERCASE_CODE');
     });
 
     it('should validate required fields', async () => {
       const response = await request(app)
         .post('/widget-types')
         .send({ name: 'Type without code', isActive: true })
-        .expect(500);
+        .expect(400);
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -205,7 +212,7 @@ describe('WidgetType Routes (Simplified)', () => {
       const response = await request(app)
         .post('/widget-types')
         .send(invalidData)
-        .expect(500); // Validation happens in preCreate hook
+        .expect(400); // Validation happens in preCreate hook
 
       expect(response.body).toMatchObject({
         error: expect.any(String)
@@ -236,11 +243,14 @@ describe('WidgetType Routes (Simplified)', () => {
         .expect(200);
 
       expect(response.body).toMatchObject({
-        id: widgetType.id,
-        code: 'UPDATED_TEST',
-        name: 'Updated Test Type',
-        description: 'Updated description',
-        isActive: false
+        success: true,
+        data: {
+          id: widgetType.id,
+          code: 'UPDATED_TEST',
+          name: 'Updated Test Type',
+          description: 'Updated description',
+          isActive: false
+        }
       });
     });
 
@@ -250,10 +260,11 @@ describe('WidgetType Routes (Simplified)', () => {
       const response = await request(app)
         .put('/widget-types/non-existent-id')
         .send(updateData)
-        .expect(500); // PItemRouter returns 500 for update failures
+        .expect(404); // PItemRouter returns 404 for not found
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
   });
@@ -273,19 +284,19 @@ describe('WidgetType Routes (Simplified)', () => {
 
       // PItemRouter returns the deleted item
       expect(response.body).toMatchObject({
-        id: widgetType.id,
-        code: 'DELETE_TEST',
-        name: 'Type to Delete'
+        success: true,
+        message: 'Widget type deleted successfully'
       });
     });
 
     it('should return 404 for non-existent widget type', async () => {
       const response = await request(app)
         .delete('/widget-types/non-existent-id')
-        .expect(500); // PItemRouter returns 500 for delete failures
+        .expect(404); // PItemRouter returns 404 for not found
 
       expect(response.body).toMatchObject({
-        message: expect.any(String)
+        success: false,
+        error: expect.any(String)
       });
     });
   });

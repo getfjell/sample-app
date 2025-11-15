@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { getWidgetCache, getWidgetTypeCache } from '../cache/ClientCache';
+import { getWidgetCacheSync, getWidgetTypeCacheSync, initializeCaches } from '../cache/ClientCache';
 
 interface CacheInitializerProps {
   children: React.ReactNode;
@@ -20,16 +20,16 @@ export const CacheInitializer: React.FC<CacheInitializerProps> = ({ children }) 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializeCaches = async () => {
+    const initializeApp = async () => {
       try {
         console.log('🚀 Initializing IndexedDB caches...');
 
-        // Get cache instances (will initialize them)
-        const widgetCache = await getWidgetCache();
-        const widgetTypeCache = await getWidgetTypeCache();
+        // Initialize all caches
+        await initializeCaches();
 
-        console.log('Widget cache:', widgetCache);
-        console.log('Widget type cache:', widgetTypeCache);
+        // Get the initialized cache instances
+        const widgetCache = getWidgetCacheSync();
+        const widgetTypeCache = getWidgetTypeCacheSync();
 
         // Access the cache maps to check if they have initialization promises
         const widgetCacheMap = widgetCache.cacheMap as any;
@@ -122,7 +122,7 @@ export const CacheInitializer: React.FC<CacheInitializerProps> = ({ children }) 
       }
     };
 
-    initializeCaches();
+    initializeApp();
   }, []);
 
   if (!isInitialized) {

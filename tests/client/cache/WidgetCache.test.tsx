@@ -19,9 +19,16 @@ const mockWidgetTypeApi: any = {
   query: vi.fn()
 };
 
+const mockWidgetComponentApi: any = {
+  read: vi.fn(),
+  write: vi.fn(),
+  query: vi.fn()
+};
+
 vi.mock('../../../src/client/api/WidgetAPI', () => ({
   widgetApi: mockWidgetApi,
-  widgetTypeApi: mockWidgetTypeApi
+  widgetTypeApi: mockWidgetTypeApi,
+  widgetComponentApi: mockWidgetComponentApi
 }));
 
 // Create test-friendly cache configuration using memory instead of IndexedDB
@@ -413,7 +420,7 @@ describe('WidgetCache', () => {
 
       // Test that they execute without throwing
       const info = WidgetCacheModule.cacheUtils.getCacheInfo();
-      const stats = WidgetCacheModule.cacheUtils.getCacheStats();
+      const stats = await WidgetCacheModule.cacheUtils.getCacheStats();
 
       expect(info.widget).toBeDefined();
       expect(info.widgetType).toBeDefined();

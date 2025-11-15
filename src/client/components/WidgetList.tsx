@@ -2,14 +2,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { useWidgets } from '../providers/WidgetProvider';
-import { WidgetCard } from './WidgetCard';
+import { useWidgetTypes } from '../providers/WidgetTypeProvider';
 import type { Widget } from '../../model/Widget';
 import type { WidgetSummary } from '../api/WidgetAPI';
+import { useRouter } from 'next/navigation';
 
 export const WidgetList: React.FC = () => {
   const { items: widgets, isLoading: loading, remove: deleteWidget } = useWidgets();
+  const { items: widgetTypes } = useWidgetTypes();
   const [summary, setSummary] = useState<WidgetSummary | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const router = useRouter();
 
   // Load summary data
   useEffect(() => {
@@ -46,9 +49,42 @@ export const WidgetList: React.FC = () => {
     }
   };
 
-  const filteredWidgets = widgets.filter(widget =>
-    showInactive || widget.isActive
-  );
+  // Sort widgets by creation date (newest first) and filter by active status
+  const filteredWidgets = widgets
+    .filter(widget => showInactive || widget.isActive)
+    .sort((a, b) => {
+      // Sort by creation date descending (newest first)
+      const dateA = new Date(a.createdAt || a.events.created.at);
+      const dateB = new Date(b.createdAt || b.events.created.at);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+  // Helper functions
+  const formatDate = (date: string | Date | undefined) => {
+    if (!date) return 'Unknown';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatData = (data: any) => {
+    if (!data) return 'No data';
+    const jsonStr = JSON.stringify(data);
+    return jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
+  };
+
+  const getWidgetTypeName = (widgetTypeId: string) => {
+    const widgetType = widgetTypes.find(wt => wt.id === widgetTypeId);
+    return widgetType ? `${widgetType.name} (${widgetType.code})` : widgetTypeId;
+  };
+
+  const handleRowClick = (widget: Widget) => {
+    router.push(`/widget/${widget.id}`);
+  };
 
   if (loading) {
     return (
@@ -109,7 +145,7 @@ export const WidgetList: React.FC = () => {
         </div>
       )}
 
-      <div className="widget-grid">
+      <div className="widget-table-container">
         {filteredWidgets.length === 0 ? (
           <div className="no-widgets">
             {showInactive
@@ -118,13 +154,72 @@ export const WidgetList: React.FC = () => {
             }
           </div>
         ) : (
-          filteredWidgets.map(widget => (
-            <WidgetCard
-              key={widget.id}
-              widget={widget}
-              onDelete={handleDelete}
-            />
-          ))
+          <div className="table-responsive">
+            <table className="widget-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Updated</th>
+                  <th>Data</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredWidgets.map(widget => (
+                  <tr
+                    key={widget.id}
+                    className={`widget-row ${!widget.isActive ? 'inactive' : ''}`}
+                    onClick={() => handleRowClick(widget)}
+                  >
+                    <td className="widget-name">
+                      <div>
+                        <strong>{widget.name}</strong>
+                        {widget.description && (
+                          <div className="widget-description">{widget.description}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="widget-type">
+                      <span className="type-badge">
+                        {getWidgetTypeName(widget.widgetTypeId)}
+                      </span>
+                    </td>
+                    <td className="widget-status">
+                      <span className={`status-badge ${widget.isActive ? 'active' : 'inactive'}`}>
+                        {widget.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="widget-date">
+                      {formatDate(widget.createdAt || widget.events.created.at)}
+                    </td>
+                    <td className="widget-date">
+                      {formatDate(widget.updatedAt || widget.events.updated.at)}
+                    </td>
+                    <td className="widget-data">
+                      <code className="data-preview">
+                        {formatData(widget.data)}
+                      </code>
+                    </td>
+                    <td className="widget-actions">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(widget);
+                        }}
+                        className="btn btn-danger"
+                        title={`Delete ${widget.name}`}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

@@ -15,11 +15,12 @@ describe('API Routes', () => {
     const libraries = testDb.getLibraries();
     widgetLib = libraries.widget;
     widgetTypeLib = libraries.widgetType;
+    const widgetComponentLib = libraries.widgetComponent;
 
     // Create Express app with the API routes
     app = express();
     app.use(express.json());
-    app.use('/api', createApiRoutes(widgetLib, widgetTypeLib));
+    app.use('/api', createApiRoutes(widgetLib, widgetTypeLib, widgetComponentLib));
   });
 
   afterEach(async () => {
@@ -257,7 +258,7 @@ describe('API Routes', () => {
         .get('/api/widget-types')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
     });
 
     it('should mount widget routes', async () => {
@@ -265,7 +266,7 @@ describe('API Routes', () => {
         .get('/api/widgets')
         .expect(200);
 
-      expect(response.body).toEqual(expect.any(Array));
+      expect(response.body).toMatchObject({ success: true, data: expect.any(Array) });
     });
 
     it('should handle 404 for unknown API routes', async () => {

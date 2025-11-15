@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWidget, useWidgets } from '../providers/WidgetProvider';
 import { useWidgetTypes } from '../providers/WidgetTypeProvider';
-import { widgetApi } from '../api/WidgetAPI';
 import type { Widget } from '../../model/Widget';
 
 interface WidgetPageProps {

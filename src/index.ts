@@ -52,7 +52,7 @@ class SampleApp {
 
       // Setup API routes
       logger.info('Setting up API routes...');
-      const apiRoutes = createApiRoutes(libraries.widget, libraries.widgetType);
+      const apiRoutes = createApiRoutes(libraries.widget, libraries.widgetType, libraries.widgetComponent);
       this.app.use('/api', apiRoutes);
 
       // Setup additional routes

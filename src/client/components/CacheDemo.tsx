@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getWidgetCache, getWidgetTypeCache } from '../cache/ClientCache';
+import { useWidgetAdapter, WidgetsQuery } from '../providers/WidgetProvider';
+import { useWidgetTypeAdapter, WidgetTypesQuery } from '../providers/WidgetTypeProvider';
+import { IQFactory } from '@fjell/core';
 
 interface QueryResult {
   data: any[];
@@ -27,10 +29,16 @@ interface CacheStats {
 }
 
 /**
- * Two Layer Cache Demonstration Component
+ * Fjell Full Stack Demonstration Component
  *
- * This component provides a comprehensive interface for testing and understanding
- * the Two Layer Cache architecture with different query types and cache behaviors.
+ * This component demonstrates the complete fjell architecture:
+ * Component → Provider/Adapter → Cache → Client-API → PItemRouter → Server
+ *
+ * Shows proper usage of:
+ * - PItemAdapter for data access through providers
+ * - Cache operations with Two-Layer caching
+ * - ItemQuery factory patterns for different query types
+ * - Real cache statistics and management
  */
 export function CacheDemo() {
   const [results, setResults] = useState<Record<string, QueryResult>>({});
@@ -43,17 +51,18 @@ export function CacheDemo() {
   useEffect(() => {
     loadWidgetTypes();
     loadCacheStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const widgetAdapter = useWidgetAdapter();
+  const widgetTypeAdapter = useWidgetTypeAdapter();
 
   const loadWidgetTypes = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/cache/widget-types/all');
-      const result = await response.json();
-      if (result.success) {
-        setWidgetTypes(result.data);
-        if (result.data.length > 0) {
-          setSelectedWidgetType(result.data[0].id);
-        }
+      const widgetTypes = await widgetTypeAdapter.all(IQFactory.all().toQuery());
+      setWidgetTypes(widgetTypes);
+      if (widgetTypes.length > 0) {
+        setSelectedWidgetType(widgetTypes[0].id);
       }
     } catch (error) {
       console.error('Failed to load widget types:', error);
@@ -62,45 +71,77 @@ export function CacheDemo() {
 
   const loadCacheStats = async () => {
     try {
-      // This would ideally get real cache stats from the cache instances
-      // For now, we'll use placeholder data
+      // Get real cache stats from the adapter cache instances
+      const widgetStats = widgetAdapter.cache.getCacheInfo();
+      const widgetTypeStats = widgetTypeAdapter.cache.getCacheInfo();
+      
+      setCacheStats({
+        widget: widgetStats,
+        widgetType: widgetTypeStats
+      });
+    } catch (error) {
+      console.error('Failed to load cache stats:', error);
+      // Fallback to placeholder data
       setCacheStats({
         widget: { hits: 0, misses: 0, size: 0 },
         widgetType: { hits: 0, misses: 0, size: 0 }
       });
-    } catch (error) {
-      console.error('Failed to load cache stats:', error);
     }
   };
 
-  const executeQuery = async (endpoint: string, queryKey: string, description: string) => {
+  const executeQuery = async (cacheType: 'widget' | 'widgetType', queryType: 'all' | 'finder', finderName?: string, finderParams?: any, description?: string) => {
+    const queryKey = `${cacheType}_${queryType}_${finderName || 'all'}`;
     setLoading(prev => ({ ...prev, [queryKey]: true }));
     
     const start = performance.now();
     
     try {
-      // Prepend Express server URL if endpoint doesn't start with http
-      const fullUrl = endpoint.startsWith('http') ? endpoint : `http://localhost:3001${endpoint}`;
-      const response = await fetch(fullUrl);
-      const end = performance.now();
-      const result = await response.json();
+      let data: any[] = [];
+      let cacheHit = false;
       
-      if (result.success) {
-        const queryResult: QueryResult = {
-          ...result,
-          timing: {
-            start,
-            end,
-            duration: end - start
-          },
-          // We could potentially detect cache hits by timing, but this is demo data
-          cacheHit: Math.random() > 0.3 // Simulate cache behavior for demo
-        };
-        
-        setResults(prev => ({ ...prev, [queryKey]: queryResult }));
+      if (cacheType === 'widget') {
+        if (queryType === 'all') {
+          data = await widgetAdapter.all(IQFactory.all().toQuery());
+          cacheHit = Math.random() > 0.5; // Simulate cache behavior - real implementation would track this
+        } else if (queryType === 'finder' && finderName) {
+          // Use the adapter's finder method directly
+          data = await widgetAdapter.find(finderName, finderParams || {});
+          cacheHit = Math.random() > 0.5; // Simulate cache behavior
+        }
+      } else {
+        if (queryType === 'all') {
+          data = await widgetTypeAdapter.all(IQFactory.all().toQuery());
+          cacheHit = Math.random() > 0.5; // Simulate cache behavior
+        } else if (queryType === 'finder' && finderName) {
+          // Use the adapter's finder method directly
+          data = await widgetTypeAdapter.find(finderName, finderParams || {});
+          cacheHit = Math.random() > 0.5; // Simulate cache behavior
+        }
       }
+      
+      const end = performance.now();
+      
+      const queryResult: QueryResult = {
+        data,
+        meta: {
+          queryType: queryType === 'finder' ? 'selective' : 'complete',
+          cacheLayer: 'query',
+          ttl: queryType === 'finder' ? '1min' : '5min',
+          description: description || `${cacheType} ${queryType} ${finderName || ''}`.trim(),
+          totalCount: data.length,
+          filteredCount: data.length
+        },
+        timing: {
+          start,
+          end,
+          duration: end - start
+        },
+        cacheHit
+      };
+      
+      setResults(prev => ({ ...prev, [queryKey]: queryResult }));
     } catch (error) {
-      console.error(`Query ${queryKey} failed:`, error);
+      console.error(`Provider query ${queryKey} failed:`, error);
     } finally {
       setLoading(prev => ({ ...prev, [queryKey]: false }));
     }
@@ -108,18 +149,16 @@ export function CacheDemo() {
 
   const clearAllCaches = async () => {
     try {
-      // Clear client-side caches
-      const widgetCache = await getWidgetCache();
-      const widgetTypeCache = await getWidgetTypeCache();
-      
-      await widgetCache.operations.reset();
-      await widgetTypeCache.operations.reset();
+      // Cache clearing is a management operation that works at the cache level
+      // This demonstrates how to access the underlying cache when needed for admin operations
+      await widgetAdapter.cache.operations.reset();
+      await widgetTypeAdapter.cache.operations.reset();
       
       // Clear results and reload stats
       setResults({});
       loadCacheStats();
       
-      console.log('All caches cleared successfully');
+      console.log('All caches cleared successfully via adapter cache references');
     } catch (error) {
       console.error('Failed to clear caches:', error);
     }
@@ -189,12 +228,93 @@ export function CacheDemo() {
             <summary className="font-medium text-sm">
               View Data ({Array.isArray(result.data) ? result.data.length : 1} items)
             </summary>
-            <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-auto max-h-32">
-              {Array.isArray(result.data)
-                ? JSON.stringify(result.data.slice(0, 3), null, 2) + (result.data.length > 3 ? '\n... and more' : '')
-                : JSON.stringify(result.data, null, 2)
-              }
-            </pre>
+            <div className="mt-4">
+              {Array.isArray(result.data) ? (
+                <div className="overflow-x-auto">
+                  <table className="cache-demo-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Data Preview</th>
+                        <th>ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.data
+                        // Sort by creation date descending (newest first)
+                        .sort((a, b) => {
+                          const dateA = new Date(a.createdAt || a.events?.created?.at || 0);
+                          const dateB = new Date(b.createdAt || b.events?.created?.at || 0);
+                          return dateB.getTime() - dateA.getTime();
+                        })
+                        .map((item, index) => (
+                          <tr key={item.id || index} className={index === 0 ? 'newest-record' : ''}>
+                            <td className="widget-name-cell">
+                              <div className="name-container">
+                                <strong className="widget-title">{item.name || 'Unnamed'}</strong>
+                                {item.description && (
+                                  <div className="widget-subtitle">{item.description}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="type-cell">
+                              <span className="type-pill">
+                                {item.widgetTypeId ? (
+                                  (() => {
+                                    const widgetType = widgetTypes.find(wt => wt.id === item.widgetTypeId);
+                                    return widgetType ? `${widgetType.name}` : 'Unknown Type';
+                                  })()
+                                ) : 'N/A'}
+                              </span>
+                            </td>
+                            <td className="status-cell">
+                              <span className={`status-pill ${item.isActive ? 'active' : 'inactive'}`}>
+                                {item.isActive ? '✓ Active' : '✗ Inactive'}
+                              </span>
+                            </td>
+                            <td className="date-cell">
+                              {(() => {
+                                const date = new Date(item.createdAt || item.events?.created?.at);
+                                return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                });
+                              })()}
+                            </td>
+                            <td className="data-cell">
+                              <details className="data-details">
+                                <summary className="data-summary">
+                                  {item.data ? '📄 View JSON' : 'No data'}
+                                </summary>
+                                {item.data && (
+                                  <pre className="json-preview">
+                                    {JSON.stringify(item.data, null, 2)}
+                                  </pre>
+                                )}
+                              </details>
+                            </td>
+                            <td className="id-cell">
+                              <code className="id-code">{(item.id || 'N/A').substring(0, 8)}...</code>
+                            </td>
+                          </tr>
+                        ))
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="non-array-data">
+                  <pre className="mt-2 text-xs bg-white p-3 rounded border overflow-auto max-h-48 font-mono">
+                    {JSON.stringify(result.data, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
           </details>
         </div>
       </div>
@@ -202,17 +322,17 @@ export function CacheDemo() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">Two Layer Cache Demonstration</h1>
+        <h1 className="text-3xl font-bold mb-4 text-gray-900">Fjell Full Stack Demonstration</h1>
         <p className="text-gray-600 mb-4">
-          This demo shows how the Two Layer Cache architecture works with different query types AND prevents cache clobbering.
+          This demo demonstrates the complete fjell architecture: <strong>Component → Provider/Adapter → Cache → Client-API → PItemRouter → Server</strong>.
+          All queries flow through fjell providers using proper patterns.
           <strong className="text-blue-600"> Complete queries</strong> use longer TTL (5 min) while
-          <strong className="text-green-600"> selective queries</strong> use shorter TTL (1 min).
-          <strong className="text-orange-600"> Cache tests</strong> demonstrate that different queries create separate cache entries.
+          <strong className="text-green-600"> selective queries</strong> use shorter TTL (1 min) via the Two-Layer Cache system.
         </p>
         
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="summary-card bg-yellow-50 border border-yellow-200 mb-6">
           <h3 className="font-semibold mb-2">🔍 How to Test:</h3>
           <div className="text-sm mb-2 bg-blue-50 p-2 rounded border border-blue-200">
             <strong>⚠️ Important:</strong> Make sure the Express API server is running on port 3001:<br/>
@@ -230,7 +350,7 @@ export function CacheDemo() {
       </div>
 
       {/* Control Panel */}
-      <div className="bg-white border rounded-lg p-4 mb-6">
+      <div className="summary-card mb-6">
         <h2 className="text-xl font-semibold mb-4">Query Controls</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -238,18 +358,18 @@ export function CacheDemo() {
           <div className="space-y-2">
             <h3 className="font-semibold text-blue-600">Complete Queries (5min TTL)</h3>
             <button
-              onClick={() => executeQuery('/api/cache/widgets/all', 'allWidgets', 'All Widgets')}
-              disabled={loading.allWidgets}
-              className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              onClick={() => executeQuery('widget', 'all', undefined, undefined, 'All Widgets')}
+              disabled={loading.widget_all_all}
+              className="btn w-full"
             >
-              {loading.allWidgets ? 'Loading...' : 'Get All Widgets'}
+              {loading.widget_all_all ? 'Loading...' : 'Get All Widgets'}
             </button>
             <button
-              onClick={() => executeQuery('/api/cache/widget-types/all', 'allWidgetTypes', 'All Widget Types')}
-              disabled={loading.allWidgetTypes}
-              className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              onClick={() => executeQuery('widgetType', 'all', undefined, undefined, 'All Widget Types')}
+              disabled={loading.widgetType_all_all}
+              className="btn w-full"
             >
-              {loading.allWidgetTypes ? 'Loading...' : 'Get All Widget Types'}
+              {loading.widgetType_all_all ? 'Loading...' : 'Get All Widget Types'}
             </button>
           </div>
 
@@ -257,18 +377,18 @@ export function CacheDemo() {
           <div className="space-y-2">
             <h3 className="font-semibold text-green-600">Selective Queries (1min TTL)</h3>
             <button
-              onClick={() => executeQuery('/api/cache/widgets/active', 'activeWidgets', 'Active Widgets Only')}
-              disabled={loading.activeWidgets}
-              className="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              onClick={() => executeQuery('widget', 'finder', 'active', {}, 'Active Widgets Only')}
+              disabled={loading.widget_finder_active}
+              className="btn w-full"
             >
-              {loading.activeWidgets ? 'Loading...' : 'Get Active Widgets'}
+              {loading.widget_finder_active ? 'Loading...' : 'Get Active Widgets'}
             </button>
             <button
-              onClick={() => executeQuery('/api/cache/widgets/recent', 'recentWidgets', 'Recent Widgets')}
-              disabled={loading.recentWidgets}
-              className="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              onClick={() => executeQuery('widget', 'finder', 'byTypeCode', {code: 'BUTTON'}, 'Widgets by Type Code')}
+              disabled={loading.widget_finder_byTypeCode}
+              className="btn w-full"
             >
-              {loading.recentWidgets ? 'Loading...' : 'Get Recent Widgets'}
+              {loading.widget_finder_byTypeCode ? 'Loading...' : 'Get Button Widgets'}
             </button>
             {selectedWidgetType && (
               <div>
@@ -285,44 +405,18 @@ export function CacheDemo() {
                 </select>
                 <button
                   onClick={() => executeQuery(
-                    `/api/cache/widgets/by-type/${selectedWidgetType}`,
-                    `widgetsByType_${selectedWidgetType}`,
-                    `Widgets by Type`
+                    'widget',
+                    'finder',
+                    'byType',
+                    {widgetTypeId: selectedWidgetType},
+                    'Widgets by Type'
                   )}
-                  disabled={loading[`widgetsByType_${selectedWidgetType}`]}
-                  className="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                  disabled={loading.widget_finder_byType}
+                  className="btn w-full"
                 >
-                  {loading[`widgetsByType_${selectedWidgetType}`] ? 'Loading...' : 'Get by Type'}
+                  {loading.widget_finder_byType ? 'Loading...' : 'Get by Type'}
                 </button>
               </div>
-            )}
-          </div>
-
-          {/* Cache Clobbering Prevention Tests */}
-          <div className="space-y-2">
-            <h3 className="font-semibold text-orange-600">Cache Clobbering Prevention</h3>
-            <button
-              onClick={() => executeQuery('/api/cache/cache/keys-demo', 'keysDemo', 'Cache Keys Demo')}
-              disabled={loading.keysDemo}
-              className="w-full px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
-            >
-              {loading.keysDemo ? 'Loading...' : 'View Cache Keys'}
-            </button>
-            {results.allWidgets?.data?.length > 0 && (
-              <button
-                onClick={() => {
-                  const firstWidget = results.allWidgets.data[0];
-                  executeQuery(
-                    `/api/cache/widgets/clobber-test/${firstWidget.id}`,
-                    'clobberTest',
-                    'Cache Clobber Test'
-                  );
-                }}
-                disabled={loading.clobberTest}
-                className="w-full px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
-              >
-                {loading.clobberTest ? 'Loading...' : 'Test Same Widget Different Queries'}
-              </button>
             )}
           </div>
 
@@ -331,30 +425,16 @@ export function CacheDemo() {
             <h3 className="font-semibold text-gray-600">Cache Management</h3>
             <button
               onClick={clearAllCaches}
-              className="w-full px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              className="btn btn-danger w-full"
             >
               Clear All Caches
-            </button>
-            <button
-              onClick={() => executeQuery('/api/cache/info', 'cacheInfo', 'Cache Configuration')}
-              disabled={loading.cacheInfo}
-              className="w-full px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
-            >
-              {loading.cacheInfo ? 'Loading...' : 'Get Cache Info'}
-            </button>
-            <button
-              onClick={() => executeQuery('/api/cache/guide', 'cacheGuide', 'Testing Guide')}
-              disabled={loading.cacheGuide}
-              className="w-full px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
-            >
-              {loading.cacheGuide ? 'Loading...' : 'View Guide'}
             </button>
           </div>
         </div>
       </div>
 
       {/* Results */}
-      <div>
+      <div className="summary-card">
         <h2 className="text-xl font-semibold mb-4">Query Results</h2>
         {Object.keys(results).length === 0 ? (
           <div className="text-center text-gray-500 py-8">
