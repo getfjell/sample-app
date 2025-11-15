@@ -193,7 +193,29 @@ The Two Layer architecture prevents cache poisoning by:
 - Separating item storage from query result storage
 - Using different TTL values based on query completeness
 - Automatic cache invalidation on item changes
-- Query-specific cache keys that distinguish different result sets
+- **Query-specific cache keys that distinguish different result sets**
+
+### Cache Clobbering Prevention
+
+**How Different Queries Get Unique Cache Keys:**
+
+1. **Base Query**: `operations.all({})` → `query:widget:all:{"query":{}}`
+2. **Filtered Query**: `operations.all({isActive: true})` → `query:widget:all:{"query":{"isActive":true}}`
+3. **Type Query**: `operations.all({widgetTypeId: "abc"})` → `query:widget:all:{"query":{"widgetTypeId":"abc"}}`
+
+**Key Generation Algorithm:**
+```typescript
+buildQueryKey(queryType: string, params: any): string {
+  const keys = ['query', this.itemType, queryType];
+  if (params) {
+    const paramStr = JSON.stringify(normalized(params), sortedKeys);
+    keys.push(paramStr);
+  }
+  return keys.join(':');
+}
+```
+
+**Result**: Each unique query creates a separate cache entry. **No clobbering possible!**
 
 ### IndexedDB Integration
 

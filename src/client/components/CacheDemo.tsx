@@ -302,7 +302,7 @@ export function CacheDemo() {
           <div className="space-y-2">
             <h3 className="font-semibold text-orange-600">Cache Clobbering Prevention</h3>
             <button
-              onClick={() => executeQuery('/api/cache/keys-demo', 'keysDemo', 'Cache Keys Demo')}
+              onClick={() => executeQuery('/api/cache/cache/keys-demo', 'keysDemo', 'Cache Keys Demo')}
               disabled={loading.keysDemo}
               className="w-full px-3 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
             >
