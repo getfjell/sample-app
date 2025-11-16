@@ -1,6 +1,6 @@
 {
   "name": "@fjell/sample-app",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Sample Fjell Next.js Application with Widget and WidgetType models",
   "keywords": [
     "fjell",
@@ -33,7 +33,7 @@
     "prepublishOnly": "npm run clean && npm run lint && npm run build && npm run test"
   },
   "dependencies": {
-    "@fjell/cache": "^4.7.44",
+    "@fjell/cache": "^4.7.45",
     "@fjell/client-api": "^4.4.54",
     "@fjell/core": "^4.4.61",
     "@fjell/express-router": "^4.4.65",
@@ -41,7 +41,7 @@
     "@fjell/lib": "^4.4.68",
     "@fjell/lib-sequelize": "^4.4.66",
     "@fjell/logging": "^4.4.58",
-    "@fjell/providers": "^4.5.73",
+    "@fjell/providers": "^4.5.74",
     "@types/express": "^5.0.0",
     "@types/supertest": "^6.0.3",
     "express": "^5.1.0",
